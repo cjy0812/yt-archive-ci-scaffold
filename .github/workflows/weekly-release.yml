@@ -38,10 +38,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@latest
+      - uses: actions/checkout@v7
 
       - name: 安装 uv 及 Python
-        uses: astral-sh/setup-uv@latest
+        uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.11"
 

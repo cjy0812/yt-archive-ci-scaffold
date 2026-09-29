@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - uses: actions/checkout@latest
+      - uses: actions/checkout@v7
 
       - name: 安装系统依赖 (ffmpeg)
         run: |
@@ -60,7 +60,7 @@ jobs:
           ffmpeg -version | head -1
 
       - name: 安装 uv 及 Python
-        uses: astral-sh/setup-uv@latest
+        uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.11"
 
@@ -121,7 +121,7 @@ jobs:
 
       - name: 上传暂存产物
         if: ${{ github.event.inputs.skip_download != 'true' }}
-        uses: actions/upload-artifact@latest
+        uses: actions/upload-artifact@v7
         with:
           name: youtube-staging-${{ github.run_id }}
           path: staging/
