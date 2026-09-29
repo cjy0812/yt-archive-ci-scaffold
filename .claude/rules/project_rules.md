@@ -43,4 +43,4 @@ feat: <简短标题>
 - 代码索引优先使用 symdex MCP
 - 文档查询优先使用 Context7
 - 禁止编造不确定的内容
-- GitHub Actions 版本：写入任何 `uses: xxx@版本号` 之前，**必须通过 GitHub MCP (`get_latest_release`)** 实际查询最新稳定版，禁止猜测或编造版本号
+- GitHub Actions 版本：写入任何 `uses: xxx@版本号` 之前，**必须通过 GitHub MCP (`get_latest_release` + `list_tags`)** 实查最新稳定版，并确认对应的大版本 tag 存在（如 `@v7`、`@v10.2`），禁止猜测或编造版本号
