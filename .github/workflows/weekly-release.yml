@@ -4,6 +4,22 @@ on:
   schedule:
     - cron: "41 5 * * 0"
   workflow_dispatch:
+    inputs:
+      days_lookback:
+        description: "回溯天数（查找最近的 staging artifacts）"
+        required: false
+        type: string
+        default: "10"
+      force_dry_run:
+        description: "仅生成清单，不创建 Release"
+        required: false
+        type: boolean
+        default: false
+      custom_title:
+        description: "自定义 Release 标题（空=自动生成日期标题）"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   actions: read
@@ -12,6 +28,9 @@ permissions:
 concurrency:
   group: youtube-weekly-release
   cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
 
 jobs:
   release:
@@ -29,7 +48,79 @@ jobs:
       - name: Install Python dependencies
         run: uv sync
 
+      - name: Download recent staging artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DAYS_LOOKBACK: ${{ github.event.inputs.days_lookback || '10' }}
+        run: |
+          mkdir -p staging/
+          # 获取最近 N 天的 daily workflow runs
+          RUN_IDS=$(gh run list --workflow daily.yml --status success --limit 30 --json databaseId --jq '.[].databaseId' 2>/dev/null || echo "")
+          if [ -z "$RUN_IDS" ]; then
+            echo "[INFO] 没有找到成功的 daily workflow runs"
+            exit 0
+          fi
+          DOWNLOAD_COUNT=0
+          for RUN_ID in $RUN_IDS; do
+            if [ "$DOWNLOAD_COUNT" -ge "$DAYS_LOOKBACK" ]; then
+              break
+            fi
+            ARTIFACT_NAME="youtube-staging-${RUN_ID}"
+            echo "  → 下载 artifact: ${ARTIFACT_NAME}"
+            if gh run download "$RUN_ID" --name "$ARTIFACT_NAME" --dir "staging/run-${RUN_ID}" 2>/dev/null; then
+              DOWNLOAD_COUNT=$((DOWNLOAD_COUNT + 1))
+            else
+              echo "[WARN] artifact ${ARTIFACT_NAME} 不存在或已过期，跳过"
+            fi
+          done
+          echo "[INFO] 共下载 ${DOWNLOAD_COUNT} 个 staging artifacts"
+          # 列出收集到的文件
+          if [ -d staging ]; then
+            find staging/ -type f | head -50
+          fi
+
       - name: Run weekly release aggregation
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DAYS_LOOKBACK: ${{ github.event.inputs.days_lookback || '10' }}
+          FORCE_DRY_RUN: ${{ github.event.inputs.force_dry_run || 'false' }}
+          CUSTOM_TITLE: ${{ github.event.inputs.custom_title || '' }}
         run: uv run python scripts/release.py
+
+      - name: De-duplicate media and validate
+        run: |
+          echo "[INFO] 验证 release 文件完整性..."
+          if [ -d release ]; then
+            find release/ -type f -exec stat --format="%n: %s bytes" {} \; | head -50
+          fi
+
+      - name: Create or update GitHub Release
+        if: ${{ github.event.inputs.force_dry_run != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -f release/release-manifest.json ]; then
+            echo "[INFO] release-manifest.json 不存在，跳过 Release 创建"
+            exit 0
+          fi
+          # 从 manifest 读取标签名
+          TAG_NAME=$(python -c "import json; m=json.load(open('release/release-manifest.json','r',encoding='utf-8')); print(m.get('tag_name','weekly-unknown'))")
+          RELEASE_TITLE=$(python -c "import json; m=json.load(open('release/release-manifest.json','r',encoding='utf-8')); print(m.get('title','YouTube Archive Weekly'))")
+          echo "  → 标签: ${TAG_NAME}"
+          echo "  → 标题: ${RELEASE_TITLE}"
+          # 清理旧 Release（如果存在）
+          gh release delete "$TAG_NAME" --yes 2>/dev/null || true
+          git push origin ":refs/tags/${TAG_NAME}" 2>/dev/null || true
+          git tag -d "$TAG_NAME" 2>/dev/null || true
+          # 收集媒体文件
+          MEDIA_FILES=$(find release/ -type f ! -name "*.json" ! -name "*.md" | tr '\n' ' ')
+          if [ -z "$MEDIA_FILES" ]; then
+            echo "[INFO] 没有媒体文件可发布"
+            exit 0
+          fi
+          # 创建 Release
+          gh release create "$TAG_NAME" \
+            --title "$RELEASE_TITLE" \
+            --notes-file release/release-notes.md \
+            $MEDIA_FILES
+          echo "[OK] Release 创建成功: ${RELEASE_TITLE}"

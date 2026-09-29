@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
 import sys
@@ -121,10 +122,14 @@ def main() -> None:
     config = load_config()
     discovery_cfg = config.get("discovery", {})
 
-    mode = discovery_cfg.get("mode", "count")
-    max_count = discovery_cfg.get("max_history_count", 10)
-    publish_after = discovery_cfg.get("publish_after", "")
-    publish_before = discovery_cfg.get("publish_before", "")
+    mode = os.environ.get("DISCOVERY_MODE") or discovery_cfg.get("mode", "count")
+    max_count = (
+        int(os.environ["MAX_HISTORY_COUNT"])
+        if "MAX_HISTORY_COUNT" in os.environ
+        else discovery_cfg.get("max_history_count", 10)
+    )
+    publish_after = os.environ.get("PUBLISH_AFTER") or discovery_cfg.get("publish_after", "")
+    publish_before = os.environ.get("PUBLISH_BEFORE") or discovery_cfg.get("publish_before", "")
 
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)

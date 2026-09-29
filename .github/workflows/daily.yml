@@ -4,6 +4,35 @@ on:
   schedule:
     - cron: "17 2 * * *"
   workflow_dispatch:
+    inputs:
+      discovery_mode:
+        description: "发现模式"
+        required: false
+        type: choice
+        default: "count"
+        options:
+          - count
+          - time
+      max_history_count:
+        description: "[count模式] 每个频道回溯多少条"
+        required: false
+        type: string
+        default: "10"
+      publish_after:
+        description: "[time模式] 起始日期 (YYYY-MM-DD)"
+        required: false
+        type: string
+        default: ""
+      publish_before:
+        description: "[time模式] 截止日期 (YYYY-MM-DD，空=至今)"
+        required: false
+        type: string
+        default: ""
+      skip_download:
+        description: "跳过下载，仅发现+决策"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -12,6 +41,9 @@ permissions:
 concurrency:
   group: youtube-daily
   cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
 
 jobs:
   archive:
@@ -23,8 +55,9 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffmpeg -version | head -1
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -35,20 +68,33 @@ jobs:
         run: uv sync
 
       - name: Discover candidates
+        env:
+          DISCOVERY_MODE: ${{ github.event.inputs.discovery_mode || 'count' }}
+          MAX_HISTORY_COUNT: ${{ github.event.inputs.max_history_count || '10' }}
+          PUBLISH_AFTER: ${{ github.event.inputs.publish_after || '' }}
+          PUBLISH_BEFORE: ${{ github.event.inputs.publish_before || '' }}
         run: uv run python scripts/discover.py
 
+      - name: Process candidates (dry-run policy only)
+        if: ${{ github.event.inputs.skip_download == 'true' }}
+        run: uv run python scripts/process.py --dry-run --candidates work/candidates.jsonl
+
       - name: Process candidates (dry-run policy first)
+        if: ${{ github.event.inputs.skip_download != 'true' }}
         run: uv run python scripts/process.py --dry-run --candidates work/candidates.jsonl
 
       - name: Process candidates (download)
+        if: ${{ github.event.inputs.skip_download != 'true' }}
         run: uv run python scripts/process.py --download --candidates work/candidates.jsonl
         timeout-minutes: 30
 
       - name: Generate subtitles
+        if: ${{ github.event.inputs.skip_download != 'true' }}
         run: uv run python scripts/subtitle.py --candidates work/candidates.jsonl
         timeout-minutes: 20
 
       - name: Commit thumbnails, URLs, subtitles and state
+        if: ${{ github.event.inputs.skip_download != 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -56,19 +102,25 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "archive: update thumbnails, URLs, subtitles and state"
             git push
+          else
+            echo "[INFO] 无变更，跳过提交"
           fi
 
       - name: Package media staging artifact
+        if: ${{ github.event.inputs.skip_download != 'true' }}
         run: |
           mkdir -p staging
-          if [ -d media ]; then
-            tar -C media -czf staging/media-${GITHUB_RUN_ID}.tar.gz . 2>/dev/null || true
+          if [ -d media ] && [ "$(ls -A media 2>/dev/null)" ]; then
+            tar -C media -czf "staging/media-${GITHUB_RUN_ID}.tar.gz" . 2>/dev/null || echo "[WARN] tar 打包失败"
+          else
+            echo "[INFO] media 目录为空，跳过打包"
           fi
           if [ -f work/decisions.json ]; then
             cp work/decisions.json staging/decisions.json
           fi
 
       - name: Upload staging artifact
+        if: ${{ github.event.inputs.skip_download != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: youtube-staging-${{ github.run_id }}

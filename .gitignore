@@ -19,5 +19,10 @@ cookies.txt
 # 封面中间文件 (只保留 webp)
 thumbnails/**/*.jpg
 thumbnails/**/*.png
+
+# 未使用的源码/venv残留
+init/
+src/
+
 # Dual Agent Sync: .trae/ is a local Trae IDE working copy
 .trae/
