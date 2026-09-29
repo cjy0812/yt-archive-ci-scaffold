@@ -7,4 +7,4 @@
 @XMSR
 
 [live]
-# @ExampleLiveChannel
+@XMSR
