@@ -3,7 +3,7 @@ name = "yt-archive-ci-scaffold"
 version = "0.1.0"
 description = "YouTube增量归档系统 - 基于GitHub Actions"
 authors = [{ name = "Ling0402", email = "cjy081219@Gmail.com" }]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = ["faster-whisper>=1.2.1", "yt-dlp>=2026.8.19"]
 
 [dependency-groups]

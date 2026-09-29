@@ -1,4 +1,4 @@
-name: Daily YouTube archive
+name: 每日 YouTube 归档
 
 on:
   schedule:
@@ -51,23 +51,23 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@latest
 
-      - name: Install system dependencies
+      - name: 安装系统依赖 (ffmpeg)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           ffmpeg -version | head -1
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+      - name: 安装 uv 及 Python
+        uses: astral-sh/setup-uv@latest
         with:
           python-version: "3.11"
 
-      - name: Install Python dependencies
+      - name: 安装 Python 依赖
         run: uv sync
 
-      - name: Discover candidates
+      - name: 发现候选视频
         env:
           DISCOVERY_MODE: ${{ github.event.inputs.discovery_mode || 'count' }}
           MAX_HISTORY_COUNT: ${{ github.event.inputs.max_history_count || '10' }}
@@ -75,38 +75,38 @@ jobs:
           PUBLISH_BEFORE: ${{ github.event.inputs.publish_before || '' }}
         run: uv run python scripts/discover.py
 
-      - name: Process candidates (dry-run policy only)
+      - name: 决策预览（仅 dry-run）
         if: ${{ github.event.inputs.skip_download == 'true' }}
         run: uv run python scripts/process.py --dry-run --candidates work/candidates.jsonl
 
-      - name: Process candidates (dry-run policy first)
+      - name: 策略决策（dry-run 预览）
         if: ${{ github.event.inputs.skip_download != 'true' }}
         run: uv run python scripts/process.py --dry-run --candidates work/candidates.jsonl
 
-      - name: Process candidates (download)
+      - name: 执行下载
         if: ${{ github.event.inputs.skip_download != 'true' }}
         run: uv run python scripts/process.py --download --candidates work/candidates.jsonl
         timeout-minutes: 30
 
-      - name: Generate subtitles
+      - name: 生成字幕
         if: ${{ github.event.inputs.skip_download != 'true' }}
         run: uv run python scripts/subtitle.py --candidates work/candidates.jsonl
         timeout-minutes: 20
 
-      - name: Commit thumbnails, URLs, subtitles and state
+      - name: 提交封面、链接、字幕和状态到 Git
         if: ${{ github.event.inputs.skip_download != 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add thumbnails/ urls/ subtitles/ state/ || true
           if ! git diff --cached --quiet; then
-            git commit -m "archive: update thumbnails, URLs, subtitles and state"
+            git commit -m "归档: 更新封面、链接、字幕和状态"
             git push
           else
             echo "[INFO] 无变更，跳过提交"
           fi
 
-      - name: Package media staging artifact
+      - name: 打包媒体暂存产物
         if: ${{ github.event.inputs.skip_download != 'true' }}
         run: |
           mkdir -p staging
@@ -119,9 +119,9 @@ jobs:
             cp work/decisions.json staging/decisions.json
           fi
 
-      - name: Upload staging artifact
+      - name: 上传暂存产物
         if: ${{ github.event.inputs.skip_download != 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@latest
         with:
           name: youtube-staging-${{ github.run_id }}
           path: staging/
