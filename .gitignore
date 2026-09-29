@@ -1,0 +1,21 @@
+# runtime
+work/
+media/
+staging/
+release/
+*.part
+*.tmp
+*.cache
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# local secrets
+.env
+cookies.txt
+
+# 封面中间文件 (只保留 webp)
+thumbnails/**/*.jpg
+thumbnails/**/*.png

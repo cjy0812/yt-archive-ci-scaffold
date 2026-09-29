@@ -1,0 +1,68 @@
+[general]
+timezone = "UTC"
+max_concurrent_videos = 1
+
+[discovery]
+# 发现模式: "count" = 按数量回溯, "time" = 按时间范围
+mode = "count"
+# count 模式: 每个频道回溯最近 N 条
+max_history_count = 10
+# time 模式: 起始日期 (ISO 格式, YYYY-MM-DD)
+publish_after = ""
+# time 模式: 截止日期 (ISO 格式, 空 = 至今)
+publish_before = ""
+# Maximum ordinary-video duration before audio-only fallback.
+normal_max_minutes = 60
+# Preferred 720p path only when duration <= this threshold.
+preferred_720p_minutes = 18
+# Treat anything at/above this duration as long-form for conservative handling.
+long_form_minutes = 60
+# 直播视频策略: 是否仅音频 (false = 像普通视频一样下载完整视频)
+audio_only_live = false
+
+[budget]
+# Estimated/actual media budget per item.
+native_720p_mb = 300
+hevc_720p_mb = 200
+fallback_480p_mb = 150
+audio_mb = 100
+
+[video]
+# Target fallback height.
+fallback_height = 480
+# 420 is allowed only if 480p is unavailable or still exceeds budget.
+minimum_video_height = 420
+# HEVC quality target. Higher CRF = smaller/lower quality.
+hevc_crf = 28
+hevc_preset = "medium"
+
+[audio]
+# Download best available audio without unnecessary re-encoding.
+format = "bestaudio"
+container = "m4a"
+
+[subtitles]
+# Prefer native subtitles before ASR.
+languages = ["zh-Hans", "zh-Hant", "zh", "en"]
+format = "vtt"
+allow_auto = true
+# Only invoke ASR if no usable native/auto subtitle exists.
+asr_model = "small"
+asr_compute_type = "int8"
+asr_device = "cpu"
+# Do not automatically ASR very long audio unless explicitly enabled.
+max_asr_minutes = 90
+
+[release]
+# Weekly release cadence.
+weekday_utc = 6
+# 7-day staging window. Must be >= weekly interval plus some margin.
+artifact_retention_days = 14
+max_release_asset_mb = 1900
+title_prefix = "YouTube Archive"
+
+[limits]
+# Safety rails.
+max_total_download_mb_per_run = 1500
+max_videos_per_run = 6
+max_audio_only_minutes = 240

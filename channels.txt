@@ -1,0 +1,10 @@
+# 频道配置文件
+# [videos] 段 = 普通视频频道
+# [live] 段 = 直播频道
+# 支持 @handle、频道 URL、或纯 handle 名
+
+[videos]
+@XMSR
+
+[live]
+# @ExampleLiveChannel

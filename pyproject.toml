@@ -1,0 +1,24 @@
+[project]
+name = "yt-archive-ci-scaffold"
+version = "0.1.0"
+description = "YouTube增量归档系统 - 基于GitHub Actions"
+authors = [{ name = "Ling0402", email = "cjy081219@Gmail.com" }]
+requires-python = ">=3.14"
+dependencies = ["faster-whisper>=1.2.1", "yt-dlp>=2026.8.19"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.11"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[build-system]
+requires = ["uv_build>=0.12.8,<0.13.0"]
+build-backend = "uv_build"

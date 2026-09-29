@@ -1,0 +1,77 @@
+name: Daily YouTube archive
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: youtube-daily
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Discover candidates
+        run: uv run python scripts/discover.py
+
+      - name: Process candidates (dry-run policy first)
+        run: uv run python scripts/process.py --dry-run --candidates work/candidates.jsonl
+
+      - name: Process candidates (download)
+        run: uv run python scripts/process.py --download --candidates work/candidates.jsonl
+        timeout-minutes: 30
+
+      - name: Generate subtitles
+        run: uv run python scripts/subtitle.py --candidates work/candidates.jsonl
+        timeout-minutes: 20
+
+      - name: Commit thumbnails, URLs, subtitles and state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add thumbnails/ urls/ subtitles/ state/ || true
+          if ! git diff --cached --quiet; then
+            git commit -m "archive: update thumbnails, URLs, subtitles and state"
+            git push
+          fi
+
+      - name: Package media staging artifact
+        run: |
+          mkdir -p staging
+          if [ -d media ]; then
+            tar -C media -czf staging/media-${GITHUB_RUN_ID}.tar.gz . 2>/dev/null || true
+          fi
+          if [ -f work/decisions.json ]; then
+            cp work/decisions.json staging/decisions.json
+          fi
+
+      - name: Upload staging artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-staging-${{ github.run_id }}
+          path: staging/
+          retention-days: 14
+          if-no-files-found: ignore
